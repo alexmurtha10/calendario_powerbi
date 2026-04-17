@@ -1,0 +1,26 @@
+{
+    "visual": {
+        "name": "Calendario_Ocyan",
+        "displayName": "calendario_ocyan",
+        "guid": "calendario_ocyan",
+        "visualClassName": "Visual",
+        "version": "1.0.0.0",
+        "description": "Calendário customizado para controle de frequência",
+        "supportUrl": "https://github.com/alexmurtha10",
+        "gitHubUrl": "https://github.com/alexmurtha10"
+    },
+    "apiVersion": "5.3.0",
+    "author": {
+        "name": "Alex Murtha",
+        "email": "a.ferreira@ocyan-sa.com"
+    },
+    "assets": {
+        "icon": "assets/icon.png"
+    },
+    "externalJS": null,
+    "style": "style/visual.less",
+    "capabilities": "capabilities.json",
+    "dependencies": null,
+    "stringResources": [],
+    "version": "1.0.0.0"
+}

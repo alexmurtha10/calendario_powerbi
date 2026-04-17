@@ -1,0 +1,195 @@
+.cal-wrap {
+    font-family: Calibri, sans-serif;
+    padding: 12px;
+    background: #f7f7f7;
+    color: #3F5C71;
+    box-sizing: border-box;
+    height: 100%;
+}
+
+/* ✅ Corrigido: era "cal-header-bar" mas não tinha display:flex — agora tem */
+.cal-header-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.cal-title {
+    font-size: 15px;
+    font-weight: bold;
+    color: #3F5C71;
+
+    span {
+        font-weight: normal;
+        text-transform: capitalize;
+    }
+}
+
+.cal-legend {
+    display: flex;
+    gap: 10px;
+    font-size: 10px;
+    color: #6b7280;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.cal-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-right: 3px;
+    vertical-align: middle;
+}
+
+.cal-legend-total {
+    color: #3F5C71;
+    margin-left: 8px;
+}
+
+/* Grid */
+.cal-grid {
+    display: grid;
+    grid-template-columns: 32px repeat(7, 1fr);
+    gap: 3px;
+}
+
+/* ✅ Corrigido: cor branca padrão aplicada a todos os .cal-dow;
+   classes .util, .sab, .dom controlam a cor do texto */
+.cal-dow {
+    background: #2E4153;
+    border-radius: 6px;
+    text-align: center;
+    padding: 7px 2px;
+    font-size: 13px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #FFFFFF; // ✅ Cor padrão branca para todos os dias da semana
+
+    &.sab,
+    &.dom {
+        color: #009CDE; // Azul para Sáb e Dom
+    }
+}
+
+.cal-corner {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 4px;
+    font-size: 9px;
+    font-weight: bold;
+    text-transform: uppercase;
+    color: #3F5C71;
+}
+
+.cal-weeknum {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: bold;
+    height: 70px;
+    color: #3F5C71;
+}
+
+/* Células */
+.cal-cell {
+    background: #FFFFFF;
+    border: 1px solid #bbbcbc;
+    border-radius: 7px;
+    padding: 5px;
+    min-height: 70px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    cursor: pointer;
+    transition: all 0.1s;
+    box-sizing: border-box;
+
+    &.empty {
+        visibility: hidden;
+        border: none;
+        cursor: default;
+    }
+
+    // ✅ Corrigido: borda lateral apenas para final de semana (visual igual ao print)
+    &.sab,
+    &.dom {
+        border-right: 4px solid #6B7280;
+    }
+
+    // ✅ Corrigido: selecionado com borda azul escuro igual ao print (não laranja)
+    &.selecionado {
+        outline: 3px solid #2E4153 !important;
+        outline-offset: -2px;
+    }
+
+    /* Heatmap Colors */
+    &.h1,
+    &.h2 {
+        background: #A5D6A7;
+
+        .cal-val {
+            color: #3F5C71;
+        }
+    }
+
+    &.h3,
+    &.h4 {
+        background: #43A047;
+
+        .cal-val {
+            color: #FFFFFF;
+        }
+    }
+
+    &.h5 {
+        background: #1B5E20;
+
+        .cal-val,
+        .cal-daynum {
+            color: #FFFFFF;
+        }
+    }
+
+    // ✅ Fundo cinza claro para finais de semana sem dados
+    &.sab.h0,
+    &.dom.h0 {
+        background: #F1F3F6;
+    }
+
+    // ✅ Hover sutil
+    &:not(.empty):hover {
+        filter: brightness(0.95);
+    }
+}
+
+.cal-daynum {
+    font-size: 10px;
+    font-weight: bold;
+    color: #355973;
+}
+
+.cal-val-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.cal-val {
+    font-size: 23px;
+    font-weight: bold;
+    line-height: 1;
+    color: #355973; // Cor padrão (dias sem dado)
+
+    &.no-value {
+        color: #355973;
+        font-size: 20px;
+    }
+}
