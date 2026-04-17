@@ -4,7 +4,7 @@ function getISOWeekNumber(d: Date): number {
     const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
     utc.setUTCDate(utc.getUTCDate() + 4 - (utc.getUTCDay() || 7));
     const yearStart = new Date(Date.UTC(utc.getUTCFullYear(), 0, 1));
-    return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+    return Math.ceil((((utc.getTime() - yearStart.getTime()) / 86400000) + 1) / 7) - 1;
 }
 
 function toLocalISO(d: Date): string {
