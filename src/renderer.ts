@@ -3,16 +3,16 @@ import { CalendarRenderData } from "./interfaces";
 export function renderCalendar(
     container: HTMLElement,
     data: CalendarRenderData,
-    selectedDate: string | null,
+    selectedIso: string | null,
     onClick: (iso: string, date: Date) => void
 ) {
     container.innerHTML = "";
 
     const { weeks, mes_label, ano, total_mes } = data;
 
-    // --- BARRA SUPERIOR (TÍTULO, LEGENDA E TOTAL) ---
+    // --- HEADER ---
     const topBar = document.createElement("div");
-    topBar.className = "cal-header-bar"; // ✅ Corrigido: era "cal-header", não existe no LESS
+    topBar.className = "cal-header-bar";
     topBar.innerHTML = `
         <div class="cal-title">
             📅 Registro de Frequência — <span>${mes_label} / ${ano}</span>
@@ -27,12 +27,11 @@ export function renderCalendar(
     `;
     container.appendChild(topBar);
 
+    // --- GRID ---
     const grid = document.createElement("div");
     grid.className = "cal-grid";
 
-    // --- CABEÇALHO DO GRID ---
-    // ✅ Corrigido: adicionada classe "util" nos dias úteis para receber cor branca via LESS
-    const headerHTML = `
+    grid.insertAdjacentHTML("beforeend", `
         <div class='cal-corner'>Sem</div>
         <div class='cal-dow util'>Seg</div>
         <div class='cal-dow util'>Ter</div>
@@ -41,11 +40,12 @@ export function renderCalendar(
         <div class='cal-dow util'>Sex</div>
         <div class='cal-dow sab'>Sáb</div>
         <div class='cal-dow dom'>Dom</div>
-    `;
-    grid.insertAdjacentHTML("beforeend", headerHTML);
+    `);
 
-    // --- RENDERIZAÇÃO DOS DIAS ---
+    const temSelecao = selectedIso !== null;
+
     weeks.forEach(week => {
+        // Número da semana
         const weekNumEl = document.createElement("div");
         weekNumEl.className = "cal-weeknum";
         weekNumEl.innerText = week.num.toString();
@@ -54,18 +54,24 @@ export function renderCalendar(
         week.days.forEach(day => {
             const cell = document.createElement("div");
 
-            // ✅ Corrigido: montagem limpa da classe, sem espaços extras quando class está vazio
             const extraClass = day.class ? day.class.trim() : "";
-            cell.className = ["cal-cell", day.heat, extraClass]
-                .filter(Boolean)
-                .join(" ");
-
-            if (day.iso === selectedDate) {
-                cell.classList.add("selecionado");
-            }
+            const classes = ["cal-cell", day.heat, extraClass].filter(Boolean);
 
             if (day.day !== "") {
-                // ✅ Corrigido: células com valor 0 mostram "—" (em vez de mostrar 0)
+                // ✅ Guarda o ISO na propriedade do elemento DOM
+                // Isso permite que updateSelectionStyles() funcione sem re-renderizar
+                (cell as any)._iso = day.iso;
+
+                if (temSelecao) {
+                    if (day.iso === selectedIso) {
+                        classes.push("selecionado");
+                    } else {
+                        classes.push("desbotado");
+                    }
+                }
+
+                cell.className = classes.join(" ");
+
                 const displayVal = day.logins > 0
                     ? `<span class="cal-val">${day.logins}</span>`
                     : `<span class="cal-val no-value">—</span>`;
@@ -75,11 +81,14 @@ export function renderCalendar(
                     <div class="cal-val-wrap">${displayVal}</div>
                 `;
 
-                cell.onclick = () => {
-                    onClick(day.iso, new Date(day.iso + "T12:00:00")); // ✅ Evita problema de fuso horário
-                };
+                cell.addEventListener("click", (e) => {
+                    e.stopPropagation(); // evita disparar o listener do container
+                    onClick(day.iso, new Date(day.iso + "T12:00:00"));
+                });
+
             } else {
-                // Célula vazia — sem conteúdo interno
+                // Célula vazia (padding do início/fim do mês)
+                cell.className = classes.join(" ");
                 cell.innerHTML = "";
             }
 

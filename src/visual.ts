@@ -3,6 +3,8 @@ import { buildCalendar } from "./calendar";
 import { renderCalendar } from "./renderer";
 import VisualConstructorOptions = powerbi.extensibility.visual.VisualConstructorOptions;
 import VisualUpdateOptions = powerbi.extensibility.visual.VisualUpdateOptions;
+import ISelectionManager = powerbi.extensibility.ISelectionManager;
+import ISelectionId = powerbi.visuals.ISelectionId;
 import { CalendarRenderData } from "./interfaces";
 
 const CALENDAR_CSS = `
@@ -102,7 +104,12 @@ const CALENDAR_CSS = `
 }
 .cal-cell.empty { visibility: hidden; border: none; cursor: default; }
 .cal-cell.sab, .cal-cell.dom { border-right: 4px solid #6B7280; }
-.cal-cell.selecionado { outline: 3px solid #2E4153; outline-offset: -2px; }
+.cal-cell.selecionado {
+    outline: 3px solid #2E4153;
+    outline-offset: -2px;
+    box-shadow: 0 0 0 3px #2E415355;
+}
+.cal-cell.desbotado { opacity: 0.35; }
 .cal-cell.h1, .cal-cell.h2 { background: #A5D6A7; }
 .cal-cell.h1 .cal-val, .cal-cell.h2 .cal-val { color: #3F5C71; }
 .cal-cell.h3, .cal-cell.h4 { background: #43A047; }
@@ -110,7 +117,7 @@ const CALENDAR_CSS = `
 .cal-cell.h5 { background: #1B5E20; }
 .cal-cell.h5 .cal-val, .cal-cell.h5 .cal-daynum { color: #FFFFFF; }
 .cal-cell.sab.h0, .cal-cell.dom.h0 { background: #F1F3F6; }
-.cal-cell:not(.empty):hover { filter: brightness(0.95); }
+.cal-cell:not(.empty):not(.desbotado):hover { filter: brightness(0.95); }
 .cal-daynum { font-size: 10px; font-weight: bold; color: #355973; }
 .cal-val-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
 .cal-val { font-size: 23px; font-weight: bold; line-height: 1; color: #355973; }
@@ -125,64 +132,91 @@ function injectStyles(id: string, css: string): void {
     document.head.appendChild(style);
 }
 
-/**
- * ✅ CORREÇÃO — Parse de datas do Power BI sem bug de fuso horário
- *
- * O Power BI envia datas em 3 formatos possíveis:
- *   - number  → serial OLE Automation (dias desde 1899-12-30)
- *   - string  → "2026-04-01T00:00:00.000Z" ou "2026-04-01"
- *   - Date    → objeto já construído
- *
- * Em todos os casos, new Date(valor).toISOString() pode retornar
- * o dia anterior em fusos UTC- (ex: UTC-3 do Brasil).
- * Esta função extrai ano/mês/dia LOCAL sem passar por UTC.
- */
+/** Converte qualquer valor de data do PBI para Date local, sem bug UTC-3 */
 function parsePBIDate(value: powerbi.PrimitiveValue): Date | null {
     if (value === null || value === undefined) return null;
-
     if (value instanceof Date) {
         return new Date(value.getFullYear(), value.getMonth(), value.getDate());
     }
-
-    if (typeof value === "number") {
-        // Serial OLE: dias inteiros desde 30/12/1899
-        const oleBase = new Date(1899, 11, 30);
-        const ms = oleBase.getTime() + Math.floor(value) * 86400000;
-        const d = new Date(ms);
-        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    }
-
     if (typeof value === "string") {
-        // Extrai Y-M-D diretamente do texto — ignora qualquer timezone
         const match = value.match(/^(\d{4})-(\d{2})-(\d{2})/);
         if (match) {
-            return new Date(
-                parseInt(match[1]),
-                parseInt(match[2]) - 1,
-                parseInt(match[3])
-            );
-        }
-        const d = new Date(value);
-        if (!isNaN(d.getTime())) {
-            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+            return new Date(parseInt(match[1]), parseInt(match[2]) - 1, parseInt(match[3]));
         }
     }
-
+    if (typeof value === "number" && value > 31) {
+        const d = new Date(new Date(1899, 11, 30).getTime() + Math.floor(value) * 86400000);
+        return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    }
     return null;
+}
+
+/**
+ * Determina o mês/ano a exibir.
+ *
+ * Ordem de prioridade:
+ *  1. Primeira data dos dados recebidos (mais confiável quando há dados)
+ *  2. Filtros JSON propagados pelo slicer no dv.metadata
+ *  3. Mês atual como último recurso
+ */
+function getMesAno(dv: powerbi.DataView, datas: Date[]): { ano: number; mes: number } {
+    if (datas.length > 0) {
+        return { ano: datas[0].getFullYear(), mes: datas[0].getMonth() };
+    }
+    try {
+        const filters: any[] = (dv?.metadata as any)?.filters ?? [];
+        let ano: number | null = null;
+        let mes: number | null = null;
+
+        for (const f of filters) {
+            if (!f?.target?.column || !f?.values?.length) continue;
+            const col = String(f.target.column).toLowerCase().trim();
+            const v   = f.values[0];
+
+            if ((col === "ano" || col === "year") && Number(v) > 1900) {
+                ano = Number(v);
+            }
+            if ((col === "mês" || col === "mes" || col === "month") && Number(v) >= 1 && Number(v) <= 12) {
+                mes = Number(v) - 1;
+            }
+            // Filtro de intervalo direto na coluna de data
+            if (col === "date_cy" || col === "data" || col === "date") {
+                const d = parsePBIDate(v);
+                if (d) return { ano: d.getFullYear(), mes: d.getMonth() };
+            }
+        }
+        if (ano !== null && mes !== null) return { ano, mes };
+        if (ano !== null)                 return { ano, mes: 0 };
+    } catch (_) { /* silencioso */ }
+
+    const hoje = new Date();
+    return { ano: hoje.getFullYear(), mes: hoje.getMonth() };
 }
 
 export class Visual {
     private host;
     private container: HTMLElement;
-    private selectedDate: string | null = null;
+    private selectionManager: ISelectionManager;
+
+    // Mapa iso → ISelectionId para cada dia que tem dado no PBI
+    private selectionIds = new Map<string, ISelectionId>();
+
+    // ISO do dia atualmente selecionado (null = nenhum)
+    private selectedIso: string | null = null;
 
     constructor(options: VisualConstructorOptions) {
         this.host = options.host;
+        this.selectionManager = this.host.createSelectionManager();
         injectStyles("calendar-heatmap-styles", CALENDAR_CSS);
-
         this.container = document.createElement("div");
         this.container.className = "cal-wrap";
         options.element.appendChild(this.container);
+
+        // Clique fora de qualquer célula limpa a seleção
+        this.container.addEventListener("click", (e) => {
+            if ((e.target as HTMLElement).closest(".cal-cell")) return;
+            this.clearSelection();
+        });
     }
 
     public update(options: VisualUpdateOptions) {
@@ -190,68 +224,96 @@ export class Visual {
         const cat = dv?.categorical?.categories?.[0];
         const val = dv?.categorical?.values?.[0];
 
-        if (!cat || !val || !cat.values || !val.values || cat.values.length === 0) {
-            this.container.innerHTML =
-                "<div style='padding:16px;color:#3F5C71;font-family:Calibri,sans-serif;'>" +
-                "Nenhum dado para exibir. Adicione os campos de Data e Valor.</div>";
-            return;
-        }
-
-        // ✅ Converte cada data do PBI sem perder o dia por causa do fuso
-        const datas: Date[] = [];
+        const datas:   Date[]   = [];
         const valores: number[] = [];
+        this.selectionIds.clear();
 
-        cat.values.forEach((rawDate, i) => {
-            const d = parsePBIDate(rawDate);
-            if (d) {
+        if (cat?.values?.length) {
+            cat.values.forEach((rawDate, i) => {
+                const d = parsePBIDate(rawDate);
+                if (!d) return;
+
+                const iso = this.toLocalISO(d);
                 datas.push(d);
-                valores.push(Number(val.values[i]) || 0);
-            }
-        });
+                valores.push(Number(val?.values?.[i]) || 0);
 
-        if (datas.length === 0) {
-            this.container.innerHTML =
-                "<div style='padding:16px;color:#3F5C71;font-family:Calibri,sans-serif;'>" +
-                "Nenhum dado válido encontrado.</div>";
-            return;
+                // Cria o SelectionId vinculado ao ponto de dados original da categoria
+                // Isso é o que permite o cross-filtering correto com outros visuais
+                const sid = this.host.createSelectionIdBuilder()
+                    .withCategory(cat, i)
+                    .createSelectionId();
+                this.selectionIds.set(iso, sid);
+            });
         }
 
-        const calendarData: CalendarRenderData = buildCalendar(datas, valores);
+        const { ano, mes } = getMesAno(dv!, datas);
+        const calendarData: CalendarRenderData = buildCalendar(datas, valores, ano, mes);
 
         renderCalendar(
             this.container,
             calendarData,
-            this.selectedDate,
-            (iso, date) => this.handleClick(iso, date)
+            this.selectedIso,
+            (iso, date) => this.handleDayClick(iso)
         );
     }
 
-    private handleClick(iso: string, date: Date) {
-        if (this.selectedDate === iso) {
-            this.selectedDate = null;
-            this.host.applyJsonFilter(null as any, "general", "filter", 2 as any);
+    private toLocalISO(d: Date): string {
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    }
+
+    private async handleDayClick(iso: string) {
+        const sid = this.selectionIds.get(iso);
+
+        if (this.selectedIso === iso) {
+            // Clicou no mesmo dia → deseleciona
+            this.selectedIso = null;
+            await this.selectionManager.clear();
         } else {
-            this.selectedDate = iso;
+            this.selectedIso = iso;
 
-            const inicio = new Date(date);
-            inicio.setHours(0, 0, 0, 0);
-
-            const fim = new Date(date);
-            fim.setHours(23, 59, 59, 999);
-
-            const filter = {
-                $schema: "http://powerbi.com/product/schema#advanced",
-                target: {
-                    table: "DIMENSAO_TEMPO",
-                    column: "DATE_CY"
-                },
-                logicalOperator: "And",
-                conditions: [
-                    { operator: "GreaterThanOrEqual", value: inicio },
-                    { operator: "LessThanOrEqual", value: fim }
-                ]
-            };
-            this.host.applyJsonFilter(filter as any, "general", "filter", 1 as any);
+            if (sid) {
+                // Dia com dado: usa SelectionManager → propaga cross-filter para todos os visuais da página
+                await this.selectionManager.select(sid, false);
+            } else {
+                // Dia sem dado: limpa qualquer seleção anterior (não há o que filtrar)
+                this.selectedIso = null;
+                await this.selectionManager.clear();
+                return;
+            }
         }
+
+        // Re-renderiza apenas para atualizar a marcação visual da célula selecionada
+        // sem precisar reconstruir todo o calendário
+        this.updateSelectionStyles();
+    }
+
+    private async clearSelection() {
+        this.selectedIso = null;
+        await this.selectionManager.clear();
+        this.updateSelectionStyles();
+    }
+
+    /**
+     * Atualiza apenas as classes CSS das células sem re-renderizar o HTML inteiro.
+     * Isso evita flicker e é muito mais performático.
+     */
+    private updateSelectionStyles() {
+        const cells = this.container.querySelectorAll<HTMLElement>(".cal-cell:not(.empty)");
+        const temSelecao = this.selectedIso !== null;
+
+        cells.forEach(cell => {
+            const iso = (cell as any)._iso as string | undefined;
+            if (!iso) return;
+
+            cell.classList.remove("selecionado", "desbotado");
+
+            if (temSelecao) {
+                if (iso === this.selectedIso) {
+                    cell.classList.add("selecionado");
+                } else {
+                    cell.classList.add("desbotado");
+                }
+            }
+        });
     }
 }
