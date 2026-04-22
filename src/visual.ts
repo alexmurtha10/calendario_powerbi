@@ -15,7 +15,8 @@ const CALENDAR_CSS = `
     color: #3F5C71;
     box-sizing: border-box;
     height: 100%;
-    overflow: auto;
+    display: flex;
+    flex-direction: column;
 }
 .cal-header-bar {
     display: flex;
@@ -58,6 +59,8 @@ const CALENDAR_CSS = `
     display: grid;
     grid-template-columns: 32px repeat(7, 1fr);
     gap: 3px;
+    flex: 1;
+    height: 0;
 }
 .cal-dow {
     background: #2E4153;
@@ -86,7 +89,7 @@ const CALENDAR_CSS = `
     justify-content: center;
     font-size: 9px;
     font-weight: bold;
-    height: 70px;
+    height: 100%;
     color: #3F5C71;
 }
 .cal-cell {
@@ -94,7 +97,8 @@ const CALENDAR_CSS = `
     border: 1px solid #bbbcbc;
     border-radius: 7px;
     padding: 5px;
-    min-height: 70px;
+    min-height: 0;
+    height: 100%;
     display: flex;
     flex-direction: column;
     position: relative;

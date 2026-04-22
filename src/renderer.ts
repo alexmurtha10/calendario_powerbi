@@ -96,5 +96,9 @@ export function renderCalendar(
         });
     });
 
+    // Define grid-template-rows: primeira linha (header) fixa, demais expandem igual
+    const numWeeks = data.weeks.length;
+    grid.style.gridTemplateRows = `auto repeat(${numWeeks}, 1fr)`;
+
     container.appendChild(grid);
 }
