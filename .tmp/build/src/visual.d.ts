@@ -12,9 +12,5 @@ export declare class Visual {
     private toLocalISO;
     private handleDayClick;
     private clearSelection;
-    /**
-     * Atualiza apenas as classes CSS das células sem re-renderizar o HTML inteiro.
-     * Isso evita flicker e é muito mais performático.
-     */
     private updateSelectionStyles;
 }

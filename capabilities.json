@@ -1,12 +1,12 @@
 {
     "dataRoles": [
         {
-            "displayName": "Category Data",
+            "displayName": "DATE_CY",
             "name": "category",
             "kind": "Grouping"
         },
         {
-            "displayName": "Measure Data",
+            "displayName": "Valor",
             "name": "measure",
             "kind": "Measure"
         },

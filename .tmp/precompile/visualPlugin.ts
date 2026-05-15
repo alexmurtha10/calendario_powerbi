@@ -5,9 +5,9 @@ import VisualConstructorOptions = powerbiVisualsApi.extensibility.visual.VisualC
 import DialogConstructorOptions = powerbiVisualsApi.extensibility.visual.DialogConstructorOptions;
 var powerbiKey: any = "powerbi";
 var powerbi: any = window[powerbiKey];
-var calendario_ocyan: IVisualPlugin = {
-    name: 'calendario_ocyan',
-    displayName: 'calendario_ocyan',
+var CalendarioGF: IVisualPlugin = {
+    name: 'CalendarioGF',
+    displayName: 'Calendário Gestão de Frequência',
     class: 'Visual',
     apiVersion: '5.3.0',
     create: (options?: VisualConstructorOptions) => {
@@ -27,6 +27,6 @@ var calendario_ocyan: IVisualPlugin = {
 if (typeof powerbi !== "undefined") {
     powerbi.visuals = powerbi.visuals || {};
     powerbi.visuals.plugins = powerbi.visuals.plugins || {};
-    powerbi.visuals.plugins["calendario_ocyan"] = calendario_ocyan;
+    powerbi.visuals.plugins["CalendarioGF"] = CalendarioGF;
 }
-export default calendario_ocyan;
+export default CalendarioGF;

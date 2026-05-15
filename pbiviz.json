@@ -1,13 +1,13 @@
 {
     "visual": {
-        "name": "Calendario_Ocyan",
-        "displayName": "calendario_ocyan",
-        "guid": "calendario_ocyan",
+        "name": "Calendário Gestão de Frequência",
+        "displayName": "Calendário Gestão de Frequência",
+        "guid": "CalendarioGF",
         "visualClassName": "Visual",
         "version": "1.0.0.0",
         "description": "Calendário customizado para controle de frequência",
-        "supportUrl": "https://github.com/alexmurtha10",
-        "gitHubUrl": "https://github.com/alexmurtha10"
+        "supportUrl": "https://github.com/alexmurtha10/calendario_powerbi",
+        "gitHubUrl": "https://github.com/alexmurtha10/calendario_powerbi"
     },
     "apiVersion": "5.3.0",
     "author": {
