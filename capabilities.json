@@ -9,45 +9,35 @@
             "displayName": "Measure Data",
             "name": "measure",
             "kind": "Measure"
+        },
+        {
+            "displayName": "Nome do Feriado",
+            "name": "holidayName",
+            "kind": "Grouping"
+        },
+        {
+            "displayName": "Classificação do Dia",
+            "name": "holidayClass",
+            "kind": "Grouping"
         }
     ],
     "objects": {
         "dataPoint": {
             "properties": {
                 "defaultColor": {
-                    "type": {
-                        "fill": {
-                            "solid": {
-                                "color": true
-                            }
-                        }
-                    }
+                    "type": { "fill": { "solid": { "color": true } } }
                 },
                 "showAllDataPoints": {
-                    "type": {
-                        "bool": true
-                    }
+                    "type": { "bool": true }
                 },
                 "fill": {
-                    "type": {
-                        "fill": {
-                            "solid": {
-                                "color": true
-                            }
-                        }
-                    }
+                    "type": { "fill": { "solid": { "color": true } } }
                 },
                 "fillRule": {
-                    "type": {
-                        "fill": {}
-                    }
+                    "type": { "fill": {} }
                 },
-                 "fontSize": {
-                    "type": {
-                        "formatting": {
-                            "fontSize": true
-                        }
-                    }
+                "fontSize": {
+                    "type": { "formatting": { "fontSize": true } }
                 }
             }
         }
@@ -56,20 +46,16 @@
         {
             "categorical": {
                 "categories": {
-                    "for": {
-                        "in": "category"
-                    },
-                    "dataReductionAlgorithm": {
-                        "top": {}
-                    }
+                    "select": [
+                        { "for": { "in": "category" } },
+                        { "bind": { "to": "holidayName" } },
+                        { "bind": { "to": "holidayClass" } }
+                    ],
+                    "dataReductionAlgorithm": { "top": {} }
                 },
                 "values": {
                     "select": [
-                        {
-                            "bind": {
-                                "to": "measure"
-                            }
-                        }
+                        { "bind": { "to": "measure" } }
                     ]
                 }
             }

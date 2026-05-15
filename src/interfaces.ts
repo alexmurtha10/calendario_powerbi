@@ -3,19 +3,20 @@ export interface CalendarDay {
     iso: string;
     value: number;
     week: number;
+    holiday?: string; // Nome do feriado (DESCRICAO_FERIADO)
 }
 
-// New interfaces for the structured data returned by buildCalendar
 export interface RenderDayData {
-    day: number | string; // Can be empty string for empty cells
+    day: number | string;
     heat: string;
-    class: string; // "sab", "dom", "hoje", "empty"
-    logins: number; // The actual value
+    class: string; // "sab", "dom", "hoje", "empty", "feriado"
+    logins: number;
     iso: string;
+    holiday?: string; // Nome do feriado, se houver
 }
 
 export interface RenderWeekData {
-    num: number; // Week number
+    num: number;
     days: RenderDayData[];
 }
 
@@ -24,4 +25,11 @@ export interface CalendarRenderData {
     mes_label: string;
     ano: number;
     total_mes: number;
+    holidays: HolidayEntry[]; // Lista de feriados do mês
+}
+
+export interface HolidayEntry {
+    iso: string;
+    day: number;
+    name: string;
 }

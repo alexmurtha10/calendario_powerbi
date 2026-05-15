@@ -1,4 +1,4 @@
-import { CalendarDay, CalendarRenderData, RenderDayData, RenderWeekData } from "./interfaces";
+import { CalendarDay, CalendarRenderData, HolidayEntry, RenderDayData, RenderWeekData } from "./interfaces";
 
 function getISOWeekNumber(d: Date): number {
     const utc = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -15,7 +15,8 @@ export function buildCalendar(
     datas: Date[],
     valores: number[],
     ano: number,
-    mes: number
+    mes: number,
+    holidayMap: Map<string, string> = new Map() // iso → nome do feriado
 ): CalendarRenderData {
 
     // Mapa ISO → valor acumulado
@@ -39,12 +40,18 @@ export function buildCalendar(
         const data = new Date(ano, mes, i);
         const iso  = toLocalISO(data);
         allDaysInMonth.push({
-            date:  data,
+            date:    data,
             iso,
-            value: map.get(iso) ?? 0,
-            week:  getISOWeekNumber(data)
+            value:   map.get(iso) ?? 0,
+            week:    getISOWeekNumber(data),
+            holiday: holidayMap.get(iso)
         });
     }
+
+    // Coleta feriados do mês
+    const holidays: HolidayEntry[] = allDaysInMonth
+        .filter(d => !!d.holiday)
+        .map(d => ({ iso: d.iso, day: d.date.getDate(), name: d.holiday! }));
 
     // Monta semanas
     const weeksData: RenderWeekData[] = [];
@@ -73,13 +80,15 @@ export function buildCalendar(
         if (d.date.getDay() === 6) cls += " sab";
         if (d.date.getDay() === 0) cls += " dom";
         if (d.iso === todayISO)    cls += " hoje";
+        if (d.holiday)             cls += " feriado";
 
         currentWeekDays.push({
-            day:    d.date.getDate(),
-            heat:   "",           // calculado depois
-            class:  cls.trim(),
-            logins: d.value,
-            iso:    d.iso
+            day:     d.date.getDate(),
+            heat:    "",           // calculado depois
+            class:   cls.trim(),
+            logins:  d.value,
+            iso:     d.iso,
+            holiday: d.holiday
         });
     });
 
@@ -114,6 +123,7 @@ export function buildCalendar(
         weeks:     weeksData,
         mes_label: primeiroDiaMes.toLocaleString("pt-BR", { month: "long" }),
         ano,
-        total_mes: allDaysInMonth.reduce((acc, d) => acc + d.value, 0)
+        total_mes: allDaysInMonth.reduce((acc, d) => acc + d.value, 0),
+        holidays
     };
 }

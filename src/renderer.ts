@@ -8,7 +8,7 @@ export function renderCalendar(
 ) {
     container.innerHTML = "";
 
-    const { weeks, mes_label, ano, total_mes } = data;
+    const { weeks, mes_label, ano, total_mes, holidays } = data;
 
     // --- HEADER ---
     const topBar = document.createElement("div");
@@ -22,6 +22,9 @@ export function renderCalendar(
             <span><span class="cal-legend-dot" style="background:#A5D6A7;"></span>Baixo</span>
             <span><span class="cal-legend-dot" style="background:#43A047;"></span>Médio</span>
             <span><span class="cal-legend-dot" style="background:#1B5E20;"></span>Alto</span>
+            ${holidays.length > 0
+                ? `<span><span class="cal-legend-dot cal-legend-dot--feriado"></span>Feriado</span>`
+                : ""}
             <span class="cal-legend-total">Total: <b>${total_mes}</b></span>
         </div>
     `;
@@ -58,8 +61,6 @@ export function renderCalendar(
             const classes = ["cal-cell", day.heat, extraClass].filter(Boolean);
 
             if (day.day !== "") {
-                // ✅ Guarda o ISO na propriedade do elemento DOM
-                // Isso permite que updateSelectionStyles() funcione sem re-renderizar
                 (cell as any)._iso = day.iso;
 
                 if (temSelecao) {
@@ -72,22 +73,34 @@ export function renderCalendar(
 
                 cell.className = classes.join(" ");
 
+                // Número do dia: adiciona * se for feriado
+                const dayLabel = day.holiday
+                    ? `${day.day}<span class="cal-feriado-asterisk">*</span>`
+                    : `${day.day}`;
+
                 const displayVal = day.logins > 0
                     ? `<span class="cal-val">${day.logins}</span>`
                     : `<span class="cal-val no-value">—</span>`;
 
+                // Ícone de feriado na célula (canto superior direito)
+                const feriadoBadge = day.holiday
+                    ? `<span class="cal-feriado-badge" title="${day.holiday}">🗓</span>`
+                    : "";
+
                 cell.innerHTML = `
-                    <span class="cal-daynum">${day.day}</span>
+                    <div class="cal-daynum-row">
+                        <span class="cal-daynum">${dayLabel}</span>
+                        ${feriadoBadge}
+                    </div>
                     <div class="cal-val-wrap">${displayVal}</div>
                 `;
 
                 cell.addEventListener("click", (e) => {
-                    e.stopPropagation(); // evita disparar o listener do container
+                    e.stopPropagation();
                     onClick(day.iso, new Date(day.iso + "T12:00:00"));
                 });
 
             } else {
-                // Célula vazia (padding do início/fim do mês)
                 cell.className = classes.join(" ");
                 cell.innerHTML = "";
             }
@@ -96,9 +109,24 @@ export function renderCalendar(
         });
     });
 
-    // Define grid-template-rows: primeira linha (header) fixa, demais expandem igual
     const numWeeks = data.weeks.length;
     grid.style.gridTemplateRows = `auto repeat(${numWeeks}, 1fr)`;
 
     container.appendChild(grid);
+
+    // --- RODAPÉ DE FERIADOS ---
+    if (holidays.length > 0) {
+        const footer = document.createElement("div");
+        footer.className = "cal-feriados-footer";
+
+        const items = holidays
+            .map(h => `<span class="cal-feriado-item"><b>${h.day}*</b> ${h.name}</span>`)
+            .join("");
+
+        footer.innerHTML = `
+            <span class="cal-feriados-label">🗓 Feriados:</span>
+            ${items}
+        `;
+        container.appendChild(footer);
+    }
 }

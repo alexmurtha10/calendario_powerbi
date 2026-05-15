@@ -126,6 +126,67 @@ const CALENDAR_CSS = `
 .cal-val-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
 .cal-val { font-size: 23px; font-weight: bold; line-height: 1; color: #355973; }
 .cal-val.no-value { color: #9aabb8; font-size: 20px; }
+
+/* ── Feriados ────────────────────────────────────────────────────── */
+.cal-cell.feriado {
+    border-top: 3px solid #E53935;
+}
+.cal-daynum-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 2px;
+}
+.cal-feriado-asterisk {
+    color: #E53935;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1;
+    vertical-align: super;
+}
+.cal-feriado-badge {
+    font-size: 9px;
+    line-height: 1;
+    opacity: 0.75;
+    cursor: default;
+}
+.cal-legend-dot--feriado {
+    background: #ffffff;
+    border: 1px solid #bbbcbc;
+    border-top: 3px solid #E53935 !important;
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+    margin-right: 3px;
+    vertical-align: middle;
+}
+/* Rodapé de feriados */
+.cal-feriados-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 14px;
+    align-items: center;
+    margin-top: 8px;
+    padding: 6px 8px;
+    background: #fff3f3;
+    border-radius: 6px;
+    border-left: 4px solid #E53935;
+    font-size: 10px;
+    color: #3F5C71;
+    flex-shrink: 0;
+}
+.cal-feriados-label {
+    font-weight: bold;
+    color: #E53935;
+    white-space: nowrap;
+}
+.cal-feriado-item {
+    white-space: nowrap;
+}
+.cal-feriado-item b {
+    color: #E53935;
+}
 `;
 
 function injectStyles(id: string, css: string): void {
@@ -269,39 +330,41 @@ export class Visual {
     public update(options: VisualUpdateOptions) {
         const dv   = options.dataViews?.[0];
         const cats = dv?.categorical?.categories ?? [];
-        const val  = dv?.categorical?.values?.[0];
 
-        // ── Identifica colunas pelo queryName/displayName ──────────────────────
-        // O campo Category Data pode ser DATE_CY sozinho OU uma hierarquia com
-        // NUM_YEAR_CY e NUM_MONTH_CY adicionados como colunas extras.
-        // Replicamos a lógica do DAX:
-        //   MAX(DIMENSAO_TEMPO[NUM_MONTH_CY]) ALLSELECTED → funciona mesmo sem dados
-        let catData: powerbi.DataViewCategoryColumn | undefined;
-        let catAno:  powerbi.DataViewCategoryColumn | undefined;
-        let catMes:  powerbi.DataViewCategoryColumn | undefined;
+        // ── Identifica colunas de categoria ──────────────────────────────────
+        // categories[] contém: DATE_CY, NUM_YEAR_CY, NUM_MONTH_CY (role "category")
+        //                      DESCRICAO_FERIADO (role "holidayName")
+        //                      CLASSIFICACAO_DIA (role "holidayClass")
+        // A identificação primária é por source.roles; fallback por nome normalizado.
+        let catData:     powerbi.DataViewCategoryColumn | undefined;
+        let catAno:      powerbi.DataViewCategoryColumn | undefined;
+        let catMes:      powerbi.DataViewCategoryColumn | undefined;
+        let catFeriado:  powerbi.DataViewCategoryColumn | undefined;
+        let catClassif:  powerbi.DataViewCategoryColumn | undefined;
 
         for (const c of cats) {
-            // Normaliza: minúsculo, sem acentos, sem espaços
-            const raw = String(
-                c.source?.queryName ?? c.source?.displayName ?? ""
-            );
-            const norm = raw.toLowerCase()
+            const roles = c.source?.roles ?? {};
+            const norm  = String(c.source?.queryName ?? c.source?.displayName ?? "")
+                .toLowerCase()
                 .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
                 .replace(/\s+/g, "");
 
-            // Detecta coluna de ANO: num_year_cy, ano, year, num_year...
-            if (/num_year|num.*ano|ano$|year/.test(norm)) {
+            if (roles["holidayName"]) {
+                catFeriado = c;
+            } else if (roles["holidayClass"]) {
+                catClassif = c;
+            } else if (/num_year|num.*ano|ano$|year/.test(norm)) {
                 catAno = c;
-            // Detecta coluna de MÊS: num_month_cy, mes, month, num_month...
             } else if (/num_month|num.*mes|mes$|month/.test(norm)) {
                 catMes = c;
-            // Tudo o mais é a coluna de data (DATE_CY)
             } else {
                 catData = c;
             }
         }
+        if (!catData) catData = cats[0];
 
-        if (!catData) catData = cats[0]; // fallback
+        // medida fica em values[0] como sempre
+        const valMedida = dv?.categorical?.values?.[0];
 
         // ── Lê os dados reais (dias com valores) ──────────────────────────────
         const datas:   Date[]   = [];
@@ -315,7 +378,7 @@ export class Visual {
 
                 const iso = this.toLocalISO(d);
                 datas.push(d);
-                valores.push(Number(val?.values?.[i]) || 0);
+                valores.push(Number(valMedida?.values?.[i]) || 0);
 
                 const sid = this.host.createSelectionIdBuilder()
                     .withCategory(catData!, i)
@@ -324,6 +387,42 @@ export class Visual {
             });
         }
 
+        // ── Monta mapa de feriados: iso → DESCRICAO_FERIADO ─────────────────
+        // catFeriado e catClassif são paralelos a catData em categories[]:
+        // mesmo número de linhas, mesmo índice = mesmo dia.
+        const TIPOS_FERIADO = new Set([
+            "feriado estadual",
+            "feriado federal",
+            "feriado municipal",
+            "feriado universal"
+        ]);
+
+        const holidayMap = new Map<string, string>();
+
+        if (catFeriado?.values?.length && catData?.values?.length) {
+            catData.values.forEach((rawDate, i) => {
+                const d = parsePBIDate(rawDate);
+                if (!d) return;
+
+                const nome = typeof catFeriado!.values[i] === "string"
+                    ? (catFeriado!.values[i] as string).trim()
+                    : "";
+                if (!nome || nome.toLowerCase() === "dia normal") return;
+
+                // Filtra por CLASSIFICACAO_DIA se o campo estiver mapeado
+                if (catClassif?.values?.length) {
+                    const classif = String(catClassif.values[i] ?? "")
+                        .toLowerCase()
+                        .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+                        .trim();
+                    if (!TIPOS_FERIADO.has(classif)) return;
+                }
+
+                holidayMap.set(this.toLocalISO(d), nome);
+            });
+        }
+
+        // ── Determina ano/mês — replica lógica ALLSELECTED do DAX ─────────────
         // ── Determina ano/mês — replica lógica ALLSELECTED do DAX ─────────────
         // Prioridade:
         //  1. Primeira data dos dados reais (mês com dados → sempre correto)
@@ -388,7 +487,7 @@ export class Visual {
             }
         }
 
-        const calendarData: CalendarRenderData = buildCalendar(datas, valores, ano, mes);
+        const calendarData: CalendarRenderData = buildCalendar(datas, valores, ano, mes, holidayMap);
 
         renderCalendar(
             this.container,
